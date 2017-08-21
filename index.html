@@ -44,124 +44,140 @@ TC[]
 ;B[ed];W[aa];B[dl];W[dk];B[cn];W[do];B[ml];W[hl];B[ol];W[nl];B[ck];W[am];B[jg];W[if]
 ;B[dj];W[bk];B[eq];W[co];B[bl];W[bm];B[bj];W[cj];B[rn];W[sl];B[ai];W[aj];B[hi];W[fi]
 ;B[hj];W[hm];B[gm];W[om];B[rm];W[ro])`;
-
-    function parse(sgf) {
-      var index = 0;
-      var info = {
-        meta: {},
-        steps: []
-      };
-
-      function skip() {
-        while (true) {
-          var ch = sgf[index];
-          if (ch !== ' ' && ch !== '\r' && ch !== '\n') {
-            break;
-          } else {
-            index++;
-          }
+    </script>
+    <script>
+      class Parser {
+        constructor(content) {
+          this.index = 0;
+          this.content = content;
+          this.result = {
+            meta: {},
+            steps: []
+          };
         }
-      }
 
-      function expect(ch) {
-        if (sgf[index] !== ch) {
-          var lines = sgf.split('\n');
-          var offset = 0;
-          for (var i = 0; i < lines.length; i++) {
-            if (index >= offset && index <= offset + lines[i].length) {
-              console.log(lines[i]);
-              console.log(' '.repeat(index - offset) + '^');
+        skip() {
+          while (true) {
+            var ch = this.current;
+            if (ch !== ' ' && ch !== '\r' && ch !== '\n') {
               break;
             } else {
-              offset += lines[i].length + 1;
+              this.index++;
             }
           }
-
-          throw new Error(`unexpected ${sgf[index]} at ${index}, expect '${ch}'`);
-        }
-        index++;
-      }
-
-      function start() {
-        skip();
-        expect('(');
-      }
-
-      function meta() {
-        var start = index;
-        while (sgf[index] !== '[' && index < sgf.length) {
-          index++;
         }
 
-        var end = index;
-        var title = sgf.slice(start, end);
-        expect('[');
-        var start = index;
-        while (sgf[index] !== ']' && index < sgf.length) {
-          index++;
-        }
+        expect(ch) {
+          if (this.current !== ch) {
+            var lines = this.content.split('\n');
+            var offset = 0;
+            for (var i = 0; i < lines.length; i++) {
+              if (this.index >= offset && this.index <= offset + lines[i].length) {
+                console.log(lines[i]);
+                console.log(' '.repeat(this.index - offset) + '^');
+                break;
+              } else {
+                offset += lines[i].length + 1;
+              }
+            }
 
-        var end = index;
-        var value = sgf.slice(start, end);
-        expect(']');
-        skip();
-        info.meta[title] = value;
-      }
-
-      function metas() {
-        skip();
-        while (sgf[index] !== ';') {
-          meta();
-        }
-      }
-
-      function step() {
-        expect(';');
-        var start = index;
-        while (sgf[index] !== '[' && index < sgf.length) {
-          index++;
-        }
-
-        var end = index;
-        var player = sgf.slice(start, end);
-        expect('[');
-        var start = index;
-        while (sgf[index] !== ']' && index < sgf.length) {
-          index++;
-        }
-
-        var end = index;
-        var position = sgf.slice(start, end);
-        expect(']');
-        skip();
-        info.steps.push({
-          player: player,
-          position: position.split('')
-        });
-      }
-
-      function steps() {
-        while (true) {
-          if (sgf[index] !== ';') {
-            break;
+            throw new Error(`unexpected ${this.current} at ${this.index}, expect '${ch}'`);
           }
 
-          step();
+          this.index++;
+        }
+
+        meta() {
+          var start = this.index;
+          while (this.current !== '[' && this.index < this.content.length) {
+            this.index++;
+          }
+
+          var end = this.index;
+          var title = this.content.slice(start, end);
+
+          this.expect('[');
+          var start = this.index;
+          while (this.current !== ']' && this.index < this.content.length) {
+            this.index++;
+          }
+
+          var end = this.index;
+          var value = this.content.slice(start, end);
+          this.expect(']');
+          this.skip();
+
+          this.meta[title] = value;
+        }
+
+        get current() {
+          return this.content[this.index];
+        }
+
+        parseMetas() {
+          this.skip();
+          while (this.current !== ';') {
+            this.meta();
+          }
+        }
+
+        parseSteps() {
+          while (true) {
+            if (this.current !== ';') {
+              break;
+            }
+
+            this.step();
+          }
+        }
+
+        step() {
+          this.expect(';');
+          var start = this.index;
+          while (this.current !== '[' && this.index < this.content.length) {
+            this.index++;
+          }
+
+          var end = this.index;
+          var player = this.content.slice(start, end);
+
+          this.expect('[');
+
+          var start = this.index;
+          while (this.current !== ']' && this.index < this.content.length) {
+            this.index++;
+          }
+
+          var end = this.index;
+          var position = this.content.slice(start, end);
+          this.expect(']');
+          this.skip();
+
+          this.result.steps.push({
+            player: player,
+            position: position
+          });
+        }
+
+        parse() {
+          // start
+          this.skip();
+          this.expect('(');
+          // metas
+          this.parseMetas();
+          // steps
+          this.parseSteps();
+          // end
+          this.skip();
+          this.expect(')');
+        }
+
+        static parse(sgf) {
+          var parser = new Parser(sgf);
+          parser.parse();
+          return parser.result;
         }
       }
-
-      function end() {
-        skip();
-        expect(')');
-      }
-
-      start();
-      metas();
-      steps();
-      end();
-
-      return info;
-    }
     </script>
     <script type="text/javascript">
       class Game {
@@ -281,8 +297,9 @@ TC[]
       // game.play(4, 4, 'black');
       // game.play(4, 17, 'white');
       console.log(game.points);
-      var record = parse(sgf);
+      var record = Parser.parse(sgf);
       console.log(record);
+
       function sleep (ms) {
         return new Promise((resolve) => {
           setTimeout(resolve, ms);
