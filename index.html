@@ -256,9 +256,8 @@ TC[]
         }
 
         play(x, y, color) {
-
+          // 已经有子
           if (this.points[y - 1][x - 1]) {
-            // 已经有子
             return {
               ok: false,
               message: '已经有子，无法落子'
@@ -286,6 +285,12 @@ TC[]
           ctx.fillStyle = color === 'black' ? '#ffffff' : '#000000';
           ctx.fillText(this.step, _x, _y);
         }
+
+        playWith(xy, player) {
+          var x = xy.charCodeAt(0) - 'a'.charCodeAt(0) + 1;
+          var y = xy.charCodeAt(1) - 'a'.charCodeAt(0) + 1;
+          this.play(x, y, player === 'B' ? 'black' : 'white');
+        }
       }
 
       var game = new Game({
@@ -309,9 +314,7 @@ TC[]
       async function job () {
         for (var i = 0; i < record.steps.length; i++) {
           var step = record.steps[i];
-          var x = step.position[0].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
-          var y = step.position[1].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
-          game.play(x, y, step.player === 'B' ? 'black' : 'white');
+          game.playWith(step.position, step.player);
           await sleep(1000);
         }
       }
