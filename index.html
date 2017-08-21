@@ -1,12 +1,168 @@
 <!DOCTYPE html>
 <html>
   <head>
-
+    <title>Go</title>
   </head>
   <body>
     <div style="text-align: center; padding-top: 150px">
       <canvas id="main"></canvas>
     </div>
+    <script type="text/javascript">
+      var sgf = `(
+TE[ÖÐÐÅÖ¤È¯±­1½ìÊÀ½çÖÇÄÜÎ§ÆåÈü¾öÈü]
+RD[2017-08-17]
+PC[ÒÁ½ð»ôÂåÆìÓ°¾çÔº]
+TM[30·ÖÖÓ]
+LT[30]
+LC[10]
+KO[7.5]
+RE[°×ÖÐÅÌÊ¤]
+PB[CGI]
+BR[]
+PW[DeepZenGo]
+WR[]
+GK[1]
+TC[]
+
+
+;B[qd];W[dd];B[pq];W[dp];B[fc];W[cf];B[dg];W[cg];B[lc];W[po];B[qm];W[qq];B[pj];W[nq]
+;B[qr];W[qp];B[op];W[pr];B[or];W[oq];B[ps];W[pp];B[mq];W[nr];B[mr];W[np];B[mp];W[ns]
+;B[fq];W[dn];B[mn];W[oe];B[pf];W[of];B[pg];W[le];B[jd];W[mc];B[mb];W[nb];B[nc];W[md]
+;B[ob];W[lb];B[na];W[kc];B[jc];W[jb];B[ib];W[jf];B[ja];W[kb];B[kd];W[ld];B[hf];W[og]
+;B[nd];W[ne];B[mf];W[lf];B[mg];W[od];B[pc];W[ie];B[hc];W[ph];B[me];W[qe];B[mi];W[lh]
+;B[mh];W[rd];B[rc];W[qi];B[jh];W[ig];B[re];W[oc];B[nb];W[pb];B[pe];W[oi];B[la];W[pd]
+;B[qc];W[kh];B[kj];W[nk];B[ji];W[hh];B[oj];W[nj];B[ni];W[pl];B[pi];W[oh];B[qj];W[qf]
+;B[qg];W[rj];B[qh];W[ri];B[nf];W[rh];B[rg];W[sg];B[rf];W[qk];B[ng];W[id];B[ic];W[lj]
+;B[lk];W[kk];B[jk];W[kl];B[li];W[ll];B[on];W[no];B[nn];W[mo];B[lo];W[ln];B[oo];W[pr]
+;B[rl];W[rk];B[pq];W[ok];B[nh];W[pr];B[ko];W[pq];B[lm];W[jl];B[in];W[gp];B[ik];W[il]
+;B[ip];W[pn];B[eo];W[ep];B[ff];W[hk];B[fp];W[fo];B[go];W[fn];B[gn];W[fh];B[gi];W[gh]
+;B[ch];W[dh];B[df];W[ef];B[fm];W[en];B[eh];W[di];B[de];W[ce];B[ei];W[eg];B[ee];W[fg]
+;B[ej];W[ci];B[fe];W[gj];B[bh];W[bi];B[gl];W[fk];B[em];W[ek];B[dm];W[cl];B[cq];W[dr]
+;B[fr];W[cm];B[dq];W[cp];B[bq];W[db];B[cc];W[dc];B[bp];W[bo];B[cd];W[bd];B[bc];W[be]
+;B[bb];W[cb];B[ba];W[ab];B[eb];W[ac];B[mj];W[ms];B[kr];W[ks];B[js];W[lr];B[lq];W[ls]
+;B[jq];W[kp];B[jp];W[je];B[pk];W[pm];B[ka];W[lc];B[ec];W[ca];B[ql];W[qn];B[bn];W[ao]
+;B[ed];W[aa];B[dl];W[dk];B[cn];W[do];B[ml];W[hl];B[ol];W[nl];B[ck];W[am];B[jg];W[if]
+;B[dj];W[bk];B[eq];W[co];B[bl];W[bm];B[bj];W[cj];B[rn];W[sl];B[ai];W[aj];B[hi];W[fi]
+;B[hj];W[hm];B[gm];W[om];B[rm];W[ro])`;
+
+    function parse(sgf) {
+      var index = 0;
+      var info = {
+        meta: {},
+        steps: []
+      };
+
+      function skip() {
+        while (true) {
+          var ch = sgf[index];
+          if (ch !== ' ' && ch !== '\r' && ch !== '\n') {
+            break;
+          } else {
+            index++;
+          }
+        }
+      }
+
+      function expect(ch) {
+        if (sgf[index] !== ch) {
+          var lines = sgf.split('\n');
+          var offset = 0;
+          for (var i = 0; i < lines.length; i++) {
+            if (index >= offset && index <= offset + lines[i].length) {
+              console.log(lines[i]);
+              console.log(' '.repeat(index - offset) + '^');
+              break;
+            } else {
+              offset += lines[i].length + 1;
+            }
+          }
+
+          throw new Error(`unexpected ${sgf[index]} at ${index}, expect '${ch}'`);
+        }
+        index++;
+      }
+
+      function start() {
+        skip();
+        expect('(');
+      }
+
+      function meta() {
+        var start = index;
+        while (sgf[index] !== '[' && index < sgf.length) {
+          index++;
+        }
+
+        var end = index;
+        var title = sgf.slice(start, end);
+        expect('[');
+        var start = index;
+        while (sgf[index] !== ']' && index < sgf.length) {
+          index++;
+        }
+
+        var end = index;
+        var value = sgf.slice(start, end);
+        expect(']');
+        skip();
+        info.meta[title] = value;
+      }
+
+      function metas() {
+        skip();
+        while (sgf[index] !== ';') {
+          meta();
+        }
+      }
+
+      function step() {
+        expect(';');
+        var start = index;
+        while (sgf[index] !== '[' && index < sgf.length) {
+          index++;
+        }
+
+        var end = index;
+        var player = sgf.slice(start, end);
+        expect('[');
+        var start = index;
+        while (sgf[index] !== ']' && index < sgf.length) {
+          index++;
+        }
+
+        var end = index;
+        var position = sgf.slice(start, end);
+        expect(']');
+        skip();
+        info.steps.push({
+          player: player,
+          position: position.split('')
+        });
+      }
+
+      function steps() {
+        while (true) {
+          if (sgf[index] !== ';') {
+            break;
+          }
+
+          step();
+        }
+      }
+
+      function end() {
+        skip();
+        expect(')');
+      }
+
+      start();
+      metas();
+      steps();
+      end();
+
+      return info;
+    }
+    </script>
     <script type="text/javascript">
       class Game {
         constructor(config) {
@@ -20,6 +176,16 @@
           this.ctx = this.canvas.getContext('2d');
           this.init();
           this.step = 0;
+          this.points = this._makePoints(this.lines);
+        }
+
+        _makePoints(lines) {
+          var l = new Array(lines);
+          for (var i = 0; i < lines; i++) {
+            l[i] = new Array(lines);
+            l[i].fill(null);
+          }
+          return l;
         }
 
         init() {
@@ -57,8 +223,38 @@
           }
         }
 
+        fillWithSGF() {
+
+        }
+
+        removeDeadGos() {
+          for (var y = 0; y < this.points.length; y++) {
+            var row = this.points[y];
+            for (var x = 0; x < row.length; x++) {
+              var go = this.points[y][x];
+              if (go) {
+
+              }
+            }
+          }
+        }
+
         play(x, y, color) {
+
+          if (this.points[y - 1][x - 1]) {
+            // 已经有子
+            return {
+              ok: false,
+              message: '已经有子，无法落子'
+            };
+          }
+
+          this.points[y - 1][x - 1] = color;
           this.step++;
+          // TODO: 计算是否提子
+          if (this.removeDeadGos()) {
+            // 如果发生提子，刷新棋盘上的
+          }
           var ctx = this.ctx;
           ctx.fillStyle = color === 'black' ? '#000000' : '#ffffff';
           // 绘制一颗黑棋
@@ -67,6 +263,7 @@
           var _y = (y - 1) * this.gridWidth + this.padding;
           ctx.arc(_x, _y, this.gridWidth / 2 - 1, 0, Math.PI * 2, true);
           ctx.fill();
+          // 棋子序号
           ctx.font = `${Math.ceil(this.gridWidth / 3) + 1}px Monaco`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -77,12 +274,31 @@
 
       var game = new Game({
         canvas: document.getElementById('main'),
-        padding: 20,
+        padding: 30,
         gridWidth: 50
       });
 
-      game.play(4, 4, 'black');
-      game.play(4, 17, 'white');
+      // game.play(4, 4, 'black');
+      // game.play(4, 17, 'white');
+      console.log(game.points);
+      var record = parse(sgf);
+      console.log(record);
+      function sleep (ms) {
+        return new Promise((resolve) => {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      async function job () {
+        for (var i = 0; i < record.steps.length; i++) {
+          var step = record.steps[i];
+          var x = step.position[0].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
+          var y = step.position[1].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
+          game.play(x, y, step.player === 'B' ? 'black' : 'white');
+          await sleep(1000);
+        }
+      }
+      job();
     </script>
   </body>
 </html>
