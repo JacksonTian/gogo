@@ -7,6 +7,13 @@
     <div style="text-align: center; padding-top: 150px">
       <canvas id="main"></canvas>
     </div>
+    <script>
+      function sleep(ms) {
+        return new Promise((resolve) => {
+          setTimeout(resolve, ms);
+        });
+      }
+    </script>
     <script type="text/javascript">
       var sgf = `(
 TE[ÖÐÐÅÖ¤È¯±­1½ìÊÀ½çÖÇÄÜÎ§ÆåÈü¾öÈü]
@@ -107,7 +114,7 @@ TC[]
           this.expect(']');
           this.skip();
 
-          this.meta[title] = value;
+          this.result.meta[title] = value;
         }
 
         get current() {
@@ -187,26 +194,28 @@ TC[]
           this.padding = config.padding || 20;
           this.lines = config.lines || 19;
 
+          this.displayNumber = config.displayNumber || false;
+
           this.width = (this.lines - 1) * this.gridWidth + this.padding * 2;
           this.height = this.width;
           this.ctx = this.canvas.getContext('2d');
-          this.init();
+          this.canvas.width = this.width;
+          this.canvas.height = this.height;
+          this.initBoard();
           this.step = 0;
           this.points = this._makePoints(this.lines);
         }
 
-        _makePoints(lines) {
+        _makePoints(lines, defaultValue = null) {
           var l = new Array(lines);
           for (var i = 0; i < lines; i++) {
             l[i] = new Array(lines);
-            l[i].fill(null);
+            l[i].fill(defaultValue);
           }
           return l;
         }
 
-        init() {
-          this.canvas.width = this.width;
-          this.canvas.height = this.height;
+        initBoard() {
           var ctx = this.ctx;
           // 绘制底盘
           ctx.fillStyle = '#DCB35C';
@@ -239,86 +248,199 @@ TC[]
           }
         }
 
+        redraw() {
+          this.initBoard();
+
+          for (var y = 0; y < this.points.length; y++) {
+            var row = this.points[y];
+            for (var x = 0; x < row.length; x++) {
+              this.drawStone(x, y);
+            }
+          }
+        }
+
         fillWithSGF() {
 
         }
 
-        removeDeadGos() {
+        removeDeadStones(color) {
+          // 当黑方落子后，仅需统计白子是否提子
+          var ctx = this.ctx;
+          var lines = this.lines;
+          var points = this._makePoints(this.lines, 0);
           for (var y = 0; y < this.points.length; y++) {
             var row = this.points[y];
             for (var x = 0; x < row.length; x++) {
               var go = this.points[y][x];
               if (go) {
+                var liberties = 4;
+                // 上方
+                if (y === 0 || this.points[y - 1][x]) {
+                  liberties--;
+                }
 
+                // 下方
+                if (y === this.lines - 1 || this.points[y + 1][x]) {
+                  liberties--;
+                }
+
+                // 左方
+                if (x === 0 || this.points[y][x - 1]) {
+                  liberties--;
+                }
+
+                if (x === this.lines - 1 || this.points[y][x + 1]) {
+                  liberties--;
+                }
+                points[y][x] = liberties;
+                // 标记气数
+                // this.drawText(x, y, liberties, 'red');
               }
             }
+          }
+
+          var flags = this._makePoints(this.lines, 0);
+          var clusters = {};
+          var clusterId = 1;
+          for (var y = 0; y < this.points.length; y++) {
+            var row = this.points[y];
+            for (var x = 0; x < row.length; x++) {
+              var go = this.points[y][x];
+              if (go && flags[y][x] === 0) {
+                // 左方
+                var left = (x !== 0 && this.points[y][x - 1] && this.points[y][x - 1].color === go.color && flags[y][x - 1] > 0) ? flags[y][x - 1] : 0;
+                var top = (y !== 0 && this.points[y - 1][x] && this.points[y - 1][x].color === go.color && flags[y - 1][x] > 0) ? flags[y - 1][x] : 0;
+                if (left > 0 && top > 0) {
+                  flags[y][x] = top;
+                  for (var i = 0; i < clusters[left].length; i++) {
+                    var item = clusters[left][i];
+                    flags[item.y][item.x] = top;
+                  }
+                  clusters[top] = clusters[top].concat(clusters[left]);
+                  clusters[left] = [];
+                } else {
+                  var max = Math.max(left, top);
+                  if (max > 0) {
+                    flags[y][x] = max;
+                  } else {
+                    flags[y][x] = clusterId++;
+                  }
+                }
+                clusters[flags[y][x]] = clusters[flags[y][x]] || [];
+                clusters[flags[y][x]].push({y, x});
+
+                // this.drawStone(x, y);
+                // this.drawText(x, y, '  ' + flags[y][x], 'red');
+              }
+            }
+          }
+
+          var needRedraw = false;
+          Object.keys(clusters).forEach((clusterId) => {
+            var cluster = clusters[clusterId];
+            if (cluster.length > 0) {
+              var liberties = 0;
+              for (var i = 0; i < cluster.length; i++) {
+                var item = cluster[i];
+                liberties += points[item.y][item.x];
+              }
+
+              if (liberties === 0) {
+                for (var i = 0; i < cluster.length; i++) {
+                  var item = cluster[i];
+                  this.points[item.y][item.x] = null;
+                  needRedraw = true;
+                }
+              }
+            }
+          });
+
+          if (needRedraw) {
+            this.redraw();
           }
         }
 
         play(x, y, color) {
           // 已经有子
-          if (this.points[y - 1][x - 1]) {
+          if (this.points[y][x]) {
             return {
               ok: false,
               message: '已经有子，无法落子'
             };
           }
 
-          this.points[y - 1][x - 1] = color;
+          // TODO: 是否无气
+
           this.step++;
-          // TODO: 计算是否提子
-          if (this.removeDeadGos()) {
-            // 如果发生提子，刷新棋盘上的
-          }
+          this.points[y][x] = {
+            color,
+            step: this.step
+          };
+
+          this.drawStone(x, y);
+          // 计算是否提子
+          this.removeDeadStones(color);
+        }
+
+        drawStone(x, y) {
           var ctx = this.ctx;
+          if (!this.points[y][x]) {
+            return;
+          }
+
+          var { color, step } = this.points[y][x];
           ctx.fillStyle = color === 'black' ? '#000000' : '#ffffff';
           // 绘制一颗黑棋
           ctx.beginPath();
-          var _x = (x - 1) * this.gridWidth + this.padding;
-          var _y = (y - 1) * this.gridWidth + this.padding;
+          var _x = x * this.gridWidth + this.padding;
+          var _y = y * this.gridWidth + this.padding;
           ctx.arc(_x, _y, this.gridWidth / 2 - 1, 0, Math.PI * 2, true);
           ctx.fill();
-          // 棋子序号
+          if (this.displayNumber) {
+            // 棋子序号
+            this.drawText(x, y, step, color === 'black' ? '#ffffff' : '#000000');
+          }
+        }
+
+        drawText(x, y, text, color) {
+          var ctx = this.ctx;
           ctx.font = `${Math.ceil(this.gridWidth / 3) + 1}px Monaco`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillStyle = color === 'black' ? '#ffffff' : '#000000';
-          ctx.fillText(this.step, _x, _y);
+          ctx.fillStyle = color;
+          var _x = (x) * this.gridWidth + this.padding;
+          var _y = (y) * this.gridWidth + this.padding;
+          ctx.fillText(text, _x, _y);
         }
 
         playWith(xy, player) {
-          var x = xy.charCodeAt(0) - 'a'.charCodeAt(0) + 1;
-          var y = xy.charCodeAt(1) - 'a'.charCodeAt(0) + 1;
+          var x = xy.charCodeAt(0) - 'a'.charCodeAt(0);
+          var y = xy.charCodeAt(1) - 'a'.charCodeAt(0);
           this.play(x, y, player === 'B' ? 'black' : 'white');
+        }
+
+        dump() {
+          // TODO: dump steps with SGF format
         }
       }
 
       var game = new Game({
         canvas: document.getElementById('main'),
         padding: 30,
-        gridWidth: 50
+        gridWidth: 50,
+        displayNumber: true
       });
 
-      // game.play(4, 4, 'black');
-      // game.play(4, 17, 'white');
-      console.log(game.points);
-      var record = Parser.parse(sgf);
-      console.log(record);
-
-      function sleep (ms) {
-        return new Promise((resolve) => {
-          setTimeout(resolve, ms);
-        });
-      }
-
-      async function job () {
+      async function replay(record) {
         for (var i = 0; i < record.steps.length; i++) {
           var step = record.steps[i];
           game.playWith(step.position, step.player);
-          await sleep(1000);
+          await sleep(500);
         }
       }
-      job();
+
+      var record = Parser.parse(sgf);
+      replay(record);
     </script>
   </body>
 </html>
