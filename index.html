@@ -263,42 +263,39 @@ TC[]
 
         }
 
+        getLiberties(x, y) {
+          var go = this.points[y][x];
+          if (go) {
+            var liberties = 4;
+            // 上方
+            if (y === 0 || this.points[y - 1][x]) {
+              liberties--;
+            }
+
+            // 下方
+            if (y === this.lines - 1 || this.points[y + 1][x]) {
+              liberties--;
+            }
+
+            // 左方
+            if (x === 0 || this.points[y][x - 1]) {
+              liberties--;
+            }
+
+            if (x === this.lines - 1 || this.points[y][x + 1]) {
+              liberties--;
+            }
+
+            return liberties;
+          } else {
+            return -1;
+          }
+        }
+
         removeDeadStones(color) {
           // 当黑方落子后，仅需统计白子是否提子
           var ctx = this.ctx;
           var lines = this.lines;
-          var points = this._makePoints(this.lines, 0);
-          for (var y = 0; y < this.points.length; y++) {
-            var row = this.points[y];
-            for (var x = 0; x < row.length; x++) {
-              var go = this.points[y][x];
-              if (go) {
-                var liberties = 4;
-                // 上方
-                if (y === 0 || this.points[y - 1][x]) {
-                  liberties--;
-                }
-
-                // 下方
-                if (y === this.lines - 1 || this.points[y + 1][x]) {
-                  liberties--;
-                }
-
-                // 左方
-                if (x === 0 || this.points[y][x - 1]) {
-                  liberties--;
-                }
-
-                if (x === this.lines - 1 || this.points[y][x + 1]) {
-                  liberties--;
-                }
-                points[y][x] = liberties;
-                // 标记气数
-                // this.drawText(x, y, liberties, 'red');
-              }
-            }
-          }
-
           var flags = this._makePoints(this.lines, 0);
           var clusters = {};
           var clusterId = 1;
@@ -342,7 +339,7 @@ TC[]
               var liberties = 0;
               for (var i = 0; i < cluster.length; i++) {
                 var item = cluster[i];
-                liberties += points[item.y][item.x];
+                liberties += this.getLiberties(item.x, item.y);
               }
 
               if (liberties === 0) {
